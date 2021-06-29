@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"kin/pkg/aws"
 	"os"
 
@@ -32,7 +33,7 @@ var listStreamsCmd = &cobra.Command{
 		}
 
 		for _, name := range output.StreamNames {
-			cmd.Println(name)
+			fmt.Println(name)
 		}
 	},
 }
