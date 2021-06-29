@@ -23,7 +23,7 @@ type RecordOutput struct {
 
 func init() {
 	tailCmd.Flags().StringP("stream-name", "n", "", "Stream name (required)")
-	tailCmd.Flags().StringP("shard", "s", "0", "Shard id")
+	tailCmd.Flags().StringP("shard", "s", "", "Shard id; if not specified, all shards will be tailed")
 	tailCmd.MarkFlagRequired("stream-name")
 
 	rootCmd.AddCommand(tailCmd)
@@ -32,7 +32,9 @@ func init() {
 var tailCmd = &cobra.Command{
 	Use:   "tail",
 	Short: "Tail records from a Kinesis Data Stream",
-	Run:   runTailCmd,
+	Long: `Continuously reads records from the target stream. Each record's payload will be
+deserialized as JSON if possible; otherwise it will be returned as a base64-encoded string.`,
+	Run: runTailCmd,
 }
 
 func runTailCmd(cmd *cobra.Command, args []string) {
@@ -45,10 +47,49 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	shardIterator, err := getShardIterator(client, &streamName, &shardId)
+	records := make(chan *RecordOutput)
+
+	if shardId != "" {
+		go tailStreamShard(client, &streamName, &shardId, records)
+	} else {
+		shardIds, err := getShardIds(client, &streamName)
+		if err != nil {
+			cmd.PrintErrln(err)
+			os.Exit(1)
+		}
+
+		for _, shardId := range shardIds {
+			go tailStreamShard(client, &streamName, shardId, records)
+		}
+	}
+
+	for record := range records {
+		jsonBytes, _ := json.Marshal(record)
+		fmt.Println(string(jsonBytes))
+	}
+}
+
+func getShardIds(client *kinesis.Client, streamName *string) ([]*string, error) {
+	output, err := client.ListShards(context.TODO(), &kinesis.ListShardsInput{
+		StreamName: streamName,
+	})
 	if err != nil {
-		cmd.PrintErrln(err)
-		os.Exit(1)
+		return nil, err
+	}
+
+	var streamNames = []*string{}
+	for _, shard := range output.Shards {
+		streamNames = append(streamNames, shard.ShardId)
+	}
+	return streamNames, nil
+}
+
+func tailStreamShard(client *kinesis.Client, streamName, shardId *string, out chan *RecordOutput) error {
+	shardIterator, err := getShardIterator(client, streamName, shardId)
+	if err != nil {
+		// FIXME What is the right way to handle the error? Right now I think we just totally ignore
+		// it, which seems bad.
+		return err
 	}
 
 	for {
@@ -57,8 +98,7 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 			&kinesis.GetRecordsInput{ShardIterator: shardIterator},
 		)
 		if err != nil {
-			cmd.PrintErrln(err)
-			os.Exit(1)
+			return err
 		}
 
 		for _, record := range res.Records {
@@ -71,15 +111,14 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 				data = record.Data
 			}
 
-			var output = RecordOutput{
+			output := RecordOutput{
 				PartitionKey:                record.PartitionKey,
 				SequenceNumber:              record.SequenceNumber,
 				ApproximateArrivalTimestamp: record.ApproximateArrivalTimestamp,
 				EncryptionType:              record.EncryptionType,
 				Data:                        &data,
 			}
-			jsonBytes, _ := json.Marshal(output)
-			fmt.Println(string(jsonBytes))
+			out <- &output
 		}
 
 		shardIterator = res.NextShardIterator
@@ -89,6 +128,8 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 
 		time.Sleep(2 * time.Second)
 	}
+
+	return nil
 }
 
 func getShardIterator(client *kinesis.Client, streamName *string, shardId *string) (*string, error) {
