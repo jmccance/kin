@@ -14,6 +14,7 @@ import (
 )
 
 type RecordOutput struct {
+	ShardId                     *string
 	PartitionKey                *string
 	SequenceNumber              *string
 	ApproximateArrivalTimestamp *time.Time
@@ -112,6 +113,7 @@ func tailStreamShard(client *kinesis.Client, streamName, shardId *string, out ch
 			}
 
 			output := RecordOutput{
+				ShardId:                     shardId,
 				PartitionKey:                record.PartitionKey,
 				SequenceNumber:              record.SequenceNumber,
 				ApproximateArrivalTimestamp: record.ApproximateArrivalTimestamp,
