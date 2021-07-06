@@ -90,6 +90,7 @@ func tailStreamShard(client *kinesis.Client, streamName, shardId *string, out ch
 	if err != nil {
 		// FIXME What is the right way to handle the error? Right now I think we just totally ignore
 		// it, which seems bad.
+		fmt.Fprintln(os.Stderr, err)
 		return err
 	}
 
@@ -99,6 +100,7 @@ func tailStreamShard(client *kinesis.Client, streamName, shardId *string, out ch
 			&kinesis.GetRecordsInput{ShardIterator: shardIterator},
 		)
 		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
 			return err
 		}
 
