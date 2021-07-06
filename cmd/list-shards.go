@@ -13,6 +13,7 @@ import (
 
 func init() {
 	listShardsCmd.Flags().StringP("stream-name", "n", "", "Stream name (required)")
+	listShardsCmd.MarkFlagRequired("stream-name")
 
 	rootCmd.AddCommand(listShardsCmd)
 }
