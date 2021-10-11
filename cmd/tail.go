@@ -11,7 +11,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
+
+type TailOptions struct {
+	AtTimestamp *time.Time
+	From        *time.Duration
+}
 
 type RecordOutput struct {
 	ShardId                     *string
@@ -25,6 +31,7 @@ type RecordOutput struct {
 func init() {
 	tailCmd.Flags().StringP("stream-name", "n", "", "Stream name (required)")
 	tailCmd.Flags().StringP("shard", "s", "", "Shard id; if not specified, all shards will be tailed")
+	tailCmd.Flags().StringP("timestamp", "t", "", "Timestamp at which to begin consuming events")
 	tailCmd.MarkFlagRequired("stream-name")
 
 	rootCmd.AddCommand(tailCmd)
@@ -41,6 +48,11 @@ deserialized as JSON if possible; otherwise it will be returned as a base64-enco
 func runTailCmd(cmd *cobra.Command, args []string) {
 	streamName, _ := cmd.Flags().GetString("stream-name")
 	shardId, _ := cmd.Flags().GetString("shard")
+	tailOptions, err := parseTailOpts(cmd.Flags())
+	if err != nil {
+		cmd.PrintErrln(err)
+		os.Exit(1)
+	}
 
 	client, err := aws.GetKinesisClient()
 	if err != nil {
@@ -51,7 +63,7 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 	records := make(chan *RecordOutput)
 
 	if shardId != "" {
-		go tailStreamShard(client, &streamName, &shardId, records)
+		go tailStreamShard(client, &streamName, &shardId, tailOptions, records)
 	} else {
 		shardIds, err := getShardIds(client, &streamName)
 		if err != nil {
@@ -60,7 +72,7 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 		}
 
 		for _, shardId := range shardIds {
-			go tailStreamShard(client, &streamName, shardId, records)
+			go tailStreamShard(client, &streamName, shardId, tailOptions, records)
 		}
 	}
 
@@ -68,6 +80,29 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 		jsonBytes, _ := json.Marshal(record)
 		fmt.Println(string(jsonBytes))
 	}
+}
+
+func parseTailOpts(flags *pflag.FlagSet) (*TailOptions, error) {
+	atTimestampS, err := flags.GetString("timestamp")
+
+	atTimestamp := (*time.Time)(nil)
+	if atTimestampS != "" {
+		t, err := time.Parse(time.RFC3339, atTimestampS)
+
+		if err != nil {
+			return nil, err
+		}
+
+		atTimestamp = &t
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &TailOptions{
+		AtTimestamp: atTimestamp,
+	}, nil
 }
 
 func getShardIds(client *kinesis.Client, streamName *string) ([]*string, error) {
@@ -85,8 +120,13 @@ func getShardIds(client *kinesis.Client, streamName *string) ([]*string, error) 
 	return streamNames, nil
 }
 
-func tailStreamShard(client *kinesis.Client, streamName, shardId *string, out chan *RecordOutput) error {
-	shardIterator, err := getShardIterator(client, streamName, shardId)
+func tailStreamShard(
+	client *kinesis.Client,
+	streamName, shardId *string,
+	tailOptions *TailOptions,
+	out chan *RecordOutput,
+) error {
+	shardIterator, err := getShardIterator(client, streamName, shardId, tailOptions)
 	if err != nil {
 		// FIXME What is the right way to handle the error? Right now I think we just totally ignore
 		// it, which seems bad.
@@ -136,13 +176,23 @@ func tailStreamShard(client *kinesis.Client, streamName, shardId *string, out ch
 	return nil
 }
 
-func getShardIterator(client *kinesis.Client, streamName *string, shardId *string) (*string, error) {
+func getShardIterator(client *kinesis.Client, streamName *string, shardId *string, options *TailOptions) (*string, error) {
+	var iteratorType types.ShardIteratorType = types.ShardIteratorTypeAtTimestamp
+	switch {
+	case options.AtTimestamp != nil:
+		iteratorType = types.ShardIteratorTypeAtTimestamp
+
+	default:
+		iteratorType = types.ShardIteratorTypeTrimHorizon
+	}
+
 	shardIteratorOutput, err := client.GetShardIterator(
 		context.TODO(),
 		&kinesis.GetShardIteratorInput{
 			ShardId:           shardId,
-			ShardIteratorType: types.ShardIteratorTypeTrimHorizon,
+			ShardIteratorType: iteratorType,
 			StreamName:        streamName,
+			Timestamp:         options.AtTimestamp,
 		},
 	)
 
