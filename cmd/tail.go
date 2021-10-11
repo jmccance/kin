@@ -16,7 +16,6 @@ import (
 
 type TailOptions struct {
 	AtTimestamp *time.Time
-	From        *time.Duration
 }
 
 type RecordOutput struct {
@@ -31,7 +30,8 @@ type RecordOutput struct {
 func init() {
 	tailCmd.Flags().StringP("stream-name", "n", "", "Stream name (required)")
 	tailCmd.Flags().StringP("shard", "s", "", "Shard id; if not specified, all shards will be tailed")
-	tailCmd.Flags().StringP("timestamp", "t", "", "Timestamp at which to begin consuming events")
+	tailCmd.Flags().StringP("timestamp", "t", "", "Timestamp at which to begin consuming events (ex: 2021-09-10T11:12:13Z")
+	tailCmd.Flags().String("from", "", "Start tailing events starting from this long ago (ex: 1h)")
 	tailCmd.MarkFlagRequired("stream-name")
 
 	rootCmd.AddCommand(tailCmd)
@@ -84,6 +84,9 @@ func runTailCmd(cmd *cobra.Command, args []string) {
 
 func parseTailOpts(flags *pflag.FlagSet) (*TailOptions, error) {
 	atTimestampS, err := flags.GetString("timestamp")
+	if err != nil {
+		return nil, err
+	}
 
 	atTimestamp := (*time.Time)(nil)
 	if atTimestampS != "" {
@@ -96,8 +99,19 @@ func parseTailOpts(flags *pflag.FlagSet) (*TailOptions, error) {
 		atTimestamp = &t
 	}
 
-	if err != nil {
-		return nil, err
+	// If timestamp wasn't specified, try getting "from" and calculating that as a duration
+	if atTimestamp == nil {
+		fromS, err := flags.GetString("from")
+		if err != nil {
+			return nil, err
+		}
+
+		from, err := time.ParseDuration(fromS)
+		if err != nil {
+			return nil, err
+		}
+		t := time.Now().Add(-from)
+		atTimestamp = &t
 	}
 
 	return &TailOptions{
