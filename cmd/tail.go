@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"kin/pkg/aws"
+	"github.com/jmccance/kin/pkg/aws"
 	"os"
 	"time"
 

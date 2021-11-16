@@ -5,7 +5,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "kin",
+	Use:   "github.com/jmccance/kin",
 	Short: "A friendly CLI for working with Amazon Kinesis",
 }
 

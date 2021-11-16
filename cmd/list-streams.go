@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"kin/pkg/aws"
+	"github.com/jmccance/kin/pkg/aws"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"

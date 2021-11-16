@@ -1,7 +1,7 @@
 package main
 
 import (
-	"kin/cmd"
+	"github.com/jmccance/kin/cmd"
 )
 
 func main() {
