@@ -3,10 +3,50 @@ kin
 
 A friendly CLI for working with AWS Kinesis.
 
-Goals
+Installation
+------------
+
+Assuming you have Go installed locally, you should be able to install with:
+
+```
+go install github.com/jmccance/kin@latest
+```
+
+By default this will install into `~/go/bin`, which you will need to add to your path.
+
+Usage
 -----
 
-The primary motivation for Kin is the need to pull records from a Kinesis stream, parse them as JSON, and output them in a way that integrates cleanly with other tools like [jq](https://github.com/stedolan/jq).
+```
+$ kin help
+A friendly CLI for working with Amazon Kinesis
+
+Usage:
+  kin [command]
+
+Available Commands:
+  help         Help about any command
+  list-shards  List shards
+  list-streams List Kinesis streams
+  tail         Tail records from a Kinesis Data Stream
+
+Flags:
+  -h, --help   help for kin
+
+Use "kin [command] --help" for more information about a command.
+```
+
+`kin` needs AWS credentials in order to access Kinesis. It should pick those up through the default credential chain, including environment variables and profiles. If you get an error like the following, it means that either you aren't signed in or `kin` isn't picking up the right profile.
+
+```
+operation error Kinesis: ListStreams, failed to sign request: failed to retrieve credentials: no EC2 IMDS role found, operation error ec2imds: GetMetadata, request canceled, context deadline exceeded
+```
+
+If you know you're signed in, the easiest thing may be to manually override the profile it's using.
+
+```
+AWS_PROFILE=staging kin ls
+```
 
 Related Work
 ------------
