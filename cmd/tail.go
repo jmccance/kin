@@ -48,13 +48,15 @@ deserialized as JSON if possible; otherwise it will be returned as a base64-enco
 func runTailCmd(cmd *cobra.Command, args []string) {
 	streamName, _ := cmd.Flags().GetString("stream-name")
 	shardId, _ := cmd.Flags().GetString("shard")
+	profile , _ := cmd.Flags().GetString("profile")
+	region , _ := cmd.Flags().GetString("region")
 	tailOptions, err := parseTailOpts(cmd.Flags())
 	if err != nil {
 		cmd.PrintErrln(err)
 		os.Exit(1)
 	}
 
-	client, err := aws.GetKinesisClient()
+	client, err := aws.GetKinesisClient(aws.WithProfile(profile), aws.WithRegion(region))
 	if err != nil {
 		cmd.PrintErrln(err)
 		os.Exit(1)

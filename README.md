@@ -31,7 +31,9 @@ Available Commands:
   tail         Tail records from a Kinesis Data Stream
 
 Flags:
-  -h, --help   help for kin
+  -h, --help             help for kin
+  -p, --profile string   AWS Profile Name
+  -r, --region string    AWS Region Name
 
 Use "kin [command] --help" for more information about a command.
 ```
