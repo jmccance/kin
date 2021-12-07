@@ -25,8 +25,10 @@ var listShardsCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		streamName, _ := cmd.Flags().GetString("stream-name")
+		profile , _ := cmd.Flags().GetString("profile")
+		region , _ := cmd.Flags().GetString("region")
 
-		client, err := aws.GetKinesisClient()
+		client, err := aws.GetKinesisClient(aws.WithProfile(profile), aws.WithRegion(region))
 		if err != nil {
 			cmd.PrintErrln(err)
 			os.Exit(1)

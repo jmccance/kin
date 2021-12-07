@@ -20,7 +20,10 @@ var listStreamsCmd = &cobra.Command{
 	Short:   "List Kinesis streams",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		client, err := aws.GetKinesisClient()
+		profile , _ := cmd.Flags().GetString("profile")
+		region , _ := cmd.Flags().GetString("region")
+
+		client, err := aws.GetKinesisClient(aws.WithProfile(profile), aws.WithRegion(region))
 		if err != nil {
 			cmd.Println(err)
 			os.Exit(1)
